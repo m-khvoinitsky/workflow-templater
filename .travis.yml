@@ -1,0 +1,49 @@
+language: python
+dist: bionic
+python:
+  - '3.7'
+addons:
+  apt:
+    packages:
+      - nsis
+install:
+  # for some reason, addons.apt.packages doesn't work on bionic
+  - sudo apt update; sudo apt install nsis
+  - pip install pynsist
+  - pip install wheel
+before_script:
+  # pycparser is not packaged as wheel on pypi which is not supported by pynsist so before build we have to download it and include it as our own package
+  - git clone https://github.com/eliben/pycparser.git /tmp/pycparser-repo
+  - git -C /tmp/pycparser-repo checkout release_v2.19
+  - cp -r /tmp/pycparser-repo/pycparser ./
+#  - export TRAVIS_TAG="${TRAVIS_TAG:-$(date +'%Y.%m.%d.%H.%M.%S')}"
+  - pip install -r requirements.txt
+script:
+  # basic test: make sure that at least example template renders properly
+  - ./workflow_templater/__init__.py --dry-run --verbose ./examples/basic_release_example/
+  - sed -i -e "s/^version=0\\.0$/version=${TRAVIS_TAG}/g" pynsist.cfg
+  - pynsist pynsist.cfg
+  - rm -r pycparser
+  - python setup.py sdist
+  - python setup.py bdist_wheel
+  - python setup.py bdist_egg
+#before_deploy:
+#  - git tag -f "${TRAVIS_TAG}"
+deploy:
+  - provider: releases
+    api_key:
+      secure: kJwi5xfxsIw/6ywm38N2gj3riluPGV+wAxTrET1RaEOEwVD6HleV3CsvovqSLU0ZtnxcNEv2s3OcNmLDhBNK5a+S0UJOxie/TSSHYqoupXd4mrdIzJ+3DNEevjNjtVToJBUxMwTa6wEJ7pvcSs5cFt/M+yk/9l59hCBI3LAwxOWW1Iw9/Dj4YAH2BQUmUEPucSAZoxXtQG3Yz218Ja8IibAzYyy/m+3BPkmQfS87TqO5SA2dpuI0bNhnnwsTlyy8JvFkfs2lewsMaM8tu+lOBQYbOUQOm7L/2FykQoAszTip9TwiKohFNcs697OK7gMyIcgxGja09sIANATK0BXc9A7UUqXSuLlTJK1dEQVN51WoTSUl05CNPFan/MlHQ/aVloKY65tOBrQ7z8SR4hP41cjPQRF45jNgr2ZxKVPkDcxmanJiG3tAcg/3MzdFn4qv3q0baq6heCMp4wamouysljlvIHfIqadchvFfYkO10ZuCm9JvMgzlryAlK6hGLm2kv03j3Mxaut3ZmDd77wLWD96xHMUDhX/6hCCHsSXGNsu9G9V6OkcZAz8F3wfGpOD247XmatqhSB9X8jhxZu9IUeckidUpV4D0D+qiPwIFZl8uDghg3pgqQqvXJoExIb49J1r/MbaCzsFQHMMUYU76Pr/pVdutoL3ivYwjHSXiLnA=
+    file_glob: true
+    file:
+      - build/nsis/Workflow_Templater_*.exe
+      - dist/*
+    skip_cleanup: true
+    on:
+      tags: true
+  - provider: pypi
+    user: m_khvoinitsky
+    password:
+      secure: "NBrblzjY5iBf69O6D++X+hvYhiv5u/HFD/MDUXqjljVPizaAWd6/vcP6hV7Zibk7TOsVlFm5VzZAilOdvrItDFBgPfzwvV/z9CnSRs66Hc8phvacAkMy+JngxaJmc+JdyvkyonFDK/ShE5QgnSsO6fXTl6R4xnf4hMphrmXIAXnl3u2MxFA8EYSCVspdMEC/xbL0HIgYH5qtUQ0RNJha8NiMmXNnZJt0+RcwaXkmTqxOPTHK2lfvgXz+0msIXvIFdS2PjX1xczgJ4Ff2O3i09OHJYB8Gd0orTeYKg5zCSTJsbULElATOnkdbDK0ZgGs7qB1Gr+y7s7Cqk2HVdRQo9g1B2RDXJtaXbWYUjZBApDnCX3a1WBiflLmcnzlcSp1utf0kPARw0ITd6ya0eC3bBM/0zsiBgvkfKHWgz8zXbeppCwszoB/npZUVNy25QJYk5LewzxDieF91XWU9LJ3hfBno1Si8vfXiaQDkgLQHhR8gKQ6tTL0rU+YN2FEfShNbPT3BOYYoj2UpM7Wwft1GpEnWju24EpPeUb35t/JPKg//+xi2ti4oT1c7Mg6dkegR/OYIC6+6OJ50Wcb6vfUy1EmsnbqCW27fdAf+L1lYVdTN7c6MHfqAeIr3BaN8ur4ccZn+4qDJr1RptaiZ9WQCAAJJPsRyrsJ/mbCh+AIZC1A="
+    distributions: "sdist bdist_wheel bdist_egg"
+    on:
+      tags: true

@@ -1,0 +1,4 @@
+Jinja2
+keyring
+ruamel.yaml
+appdirs

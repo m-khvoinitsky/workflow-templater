@@ -1,0 +1,17 @@
+summary: Release version {{ version }} of our shiny project
+project:
+  key: PRJ
+issuetype:
+  name: Task
+components:
+- name: Releases
+priority:
+  name: Medium
+labels:
+- 'version_{{ version }}'
+assignee:
+  name: '{{ release_manager }}'
+description: |-
+  We're going to release a {{ version }} version.
+  Date and time: {{ release_time.strftime('%Y-%m-%d %H:%M') }} UTC
+  All information is in subtasks

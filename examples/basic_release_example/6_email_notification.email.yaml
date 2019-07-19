@@ -1,0 +1,17 @@
+if: "{{ send_mail }}"
+Subject: "{% if updating is defined %}Re: {% endif %}Release version {{ version }} of our shiny project"
+To:
+- release_mailing_list@example.com
+- '{{ build_engineer }}@example.com'
+- '{{ deploy_engineer }}@example.com'
+- '{{ client_release_responsible }}@example.com'
+- '{{ qa_engineer }}@example.com'
+- '{{ release_manager }}@example.com'
+Message-ID: "release-{{ issuekey_1_main }}{% if updating is defined %}-{{ updating }}{% endif %}@example.com"
+In-Reply-To: "{% if updating is defined %}release-{{ issuekey_1_main }}@example.com{% endif %}"
+Body: |-
+  {% if updating is defined %}Note: information about following release has been updated (see below){% endif %}
+  We're going to release a {{ version }} version.
+  Date and time: {{ release_time.strftime('%Y-%m-%d %H:%M') }} UTC
+  Main jira issue: https://jira.example.com/browse/{{ issuekey_1_main }}
+  Responsible release manager: {{ release_manager }}

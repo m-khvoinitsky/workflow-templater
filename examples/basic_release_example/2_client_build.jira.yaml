@@ -1,0 +1,17 @@
+summary: Build client version {{ version }}
+project:
+  key: PRJ
+issuetype:
+  name: Sub-task
+parent:
+  key: '{{ issuekey_1_main }}'
+components:
+- name: Releases
+priority:
+  name: Medium
+labels:
+- 'version_{{ version }}'
+assignee:
+  name: '{{ build_engineer }}'
+description: |-
+  Summary should be clear enough

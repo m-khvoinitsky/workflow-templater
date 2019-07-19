@@ -1,0 +1,24 @@
+summary: Upload client version {{ version }} to stores
+project:
+  key: PRJ
+issuetype:
+  name: Sub-task
+parent:
+  key: '{{ issuekey_1_main }}'
+components:
+- name: Releases
+priority:
+  name: Medium
+labels:
+- 'version_{{ version }}'
+assignee:
+  name: '{{ client_release_responsible }}'
+update:
+  issuelinks:
+  - add:
+      type:
+        name: Blocks
+      inwardIssue:
+        key: '{{ issuekey_2_client_build }}'
+description: |-
+  Summary should be clear enough

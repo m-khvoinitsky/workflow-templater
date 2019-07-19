@@ -1,0 +1,9 @@
+version: "2.0"
+# all names are fictional
+build_engineer: aaron_wayne
+deploy_engineer: alice_johnson
+client_release_responsible: stanislav_petrov
+qa_engineer: gloria_miller
+release_manager: case_parker
+release_time: !!timestamp 2019-05-30 08:00:00.0
+send_mail: true
