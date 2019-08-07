@@ -27,7 +27,8 @@ Template engine for (currently) Jira and Email. Uses yaml and jinja2. It helps y
 ## Windows
 1. Download Workflow_Templater_${version}.exe from the latest release on [Releases page](https://github.com/m-khvoinitsky/workflow-templater/releases).
 2. Install it.
-3. Now `workflow-templater` executable should be available from Windows Command Prompt (`cmd.exe`).
+3. Now `workflow-templater` executable should be available from Windows Command Prompt (`cmd.exe`) and from Powershell.
+4. (Optional, recommended) Install [Windows Terminal](https://github.com/Microsoft/Terminal) and use it instead of default console.
 
 ## macOS
 1. Install python ≥ 3.7.
