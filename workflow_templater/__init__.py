@@ -45,13 +45,18 @@ def jinja_render_recursive(env, what, vars, path):
         return dict(map(lambda items: (items[0], jinja_render_recursive(env, items[1], vars, path + [items[0]]),), what.items()))
     elif type(what) == str:
         try:
-            return env.from_string(what).render(vars)
+            result = env.from_string(what).render(vars)
+            JSONMARKER = 'parsejson:'
+            if result.startswith(JSONMARKER):
+                return json.loads(result[len(JSONMARKER):])
+            else:
+                return result
         except Exception as e:
-            logging.critical('Template error in {path}: {err}. Exiting...'.format(
+            logging.critical('Template error in {path}: {err}.'.format(
                 path='/'.join(path),
                 err=repr(e),
             ))
-            sys.exit(1)
+            raise
     else:
         return what
 
