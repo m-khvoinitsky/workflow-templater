@@ -87,10 +87,11 @@ class Issue:
         self.additional_vars = additional_vars # TODO: remove them? Don't forget about foreach_key and shit
         self.data = data
         self.is_dryrun = is_dryrun
+        self.self_key_dict = {}
 
     @property
     def final_vars(self):
-        return dict(**self.common_vars, **self.additional_vars)
+        return dict(**self.common_vars, **self.additional_vars, **self.self_key_dict)
 
     @property
     def id(self):
@@ -100,6 +101,7 @@ class Issue:
     def id(self, id):
         self._id = id
         self.common_vars[f'issuekey_{ self.name }'] = id
+        self.self_key_dict['issuekey_self'] = id
 
     def update(self):
         raise NotImplementedError()
