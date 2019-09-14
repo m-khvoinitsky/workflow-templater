@@ -9,13 +9,16 @@ import json
 from io import StringIO
 from shlex import quote
 from functools import partial
+from itertools import chain
 if __name__ == '__main__':
     # preserve ability to launch this script (__main__.py) directly
     from urlopen_jira import urlopen_jira, get_password
     from our_jinja import OurJinjaEnvironment, OurJinjaLoader
+    from quote_windows import escape_cmd, escape_ps
 else:
     from .urlopen_jira import urlopen_jira, get_password
     from .our_jinja import OurJinjaEnvironment, OurJinjaLoader
+    from .quote_windows import escape_cmd, escape_ps
 from jinja2 import StrictUndefined, DebugUndefined
 import datetime
 import smtplib
@@ -179,13 +182,34 @@ ISSUE_TYPES = {
     '.email.yaml': EmailIssue,
 }
 
+def prepare_future_update_cmd(issues, common_vars, updating):
+    future_update_arg = json.dumps(dict(map(lambda issue: (issue.name, issue.id), issues)))
+    update_issues_cmd_parts = sys.argv[1:].copy()
+    if updating:
+        for i, arg in enumerate(update_issues_cmd_parts):
+            if arg == '--update':
+                update_issues_cmd_parts[i + 1] = future_update_arg
+                break
+    else:
+        update_issues_cmd_parts.insert(0, '--update')
+        update_issues_cmd_parts.insert(1, future_update_arg)
+    update_issues_cmd = '\n'.join((
+        '', 'For cmd.exe:',
+        ' '.join(chain((os.path.basename(sys.argv[0]),), map(escape_cmd, update_issues_cmd_parts))),
+        '', 'For Powershell:',
+        ' '.join((os.path.basename(sys.argv[0]), escape_ps(update_issues_cmd_parts),)),
+        '', 'For UNIX Shell:',
+        ' '.join(chain((sys.argv[0],), map(quote, update_issues_cmd_parts))),
+    ))
+    common_vars['update_issues_cmd'] = update_issues_cmd
 
 def main():
-    parser = argparse.ArgumentParser(description='Jira issue maker')
+    parser = argparse.ArgumentParser(description='Workflow Templater', formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('--dry-run', action='store_true', help='do not post anything to jira, do not send emails, just render templates')
     parser.add_argument('--no-dry-run', action='store_false', dest='dry_run', help='disable dry-run if it was enabled in config file')
     parser.add_argument('-v', '--verbose', action='store_true', help='be verbose')
-    parser.add_argument('--update', type=str, help='do not create issues in jira, update existing instead')
+    parser.add_argument('--vars', type=str, metavar='FILE', help='read variables from FILE instead of *common.yaml')
+    parser.add_argument('--update', type=str, help='do not create issues in jira, update existing instead. Format: JSON like {"issue_file_1": "issuekey2", "issue_file_2": "issuekey2"}. You most likely don\'t need to write it youself (however, you can), instead, workflow-templater at the end will will print command to re-launch it with this argument. If you want, you can include this command in the template as "update_issues_cmd" variable.')
     parser.add_argument('--jira', type=str, help='jira API url, ex. https://jira.example.com')
     parser.add_argument('--jira-user', type=str)
     parser.add_argument('--jira-keyring-service-name', type=str, default=None)
@@ -241,18 +265,28 @@ def main():
         level=logging.DEBUG if args.verbose else logging.WARNING,
         format='%(levelname)s %(message)s'
     )
+    issues = []
+    common_vars = {}
     def excepthook(exc_type, exc_value, exc_traceback):
         logging.error("Unhandled exception", exc_info=(exc_type, exc_value, exc_traceback,))
+        if issues:
+            prepare_future_update_cmd(issues, common_vars, args.update)
+            print('\nError happened, but some issues have already been created. To update existing issues, edit templates/vars, then execute:\n')
+            print(common_vars['update_issues_cmd'])
+            print('\nFAIL')
 
     sys.excepthook = excepthook
 
-    common_vars = {}
-    for common_vars_file in COMMON_VARS_FILES:
-        try:
-            with open(os.path.join(args.template_dir, common_vars_file), 'r', encoding='utf8') as f:
-                common_vars = yaml.load(f)
-        except FileNotFoundError:
-            pass
+    if args.vars:
+        with open(os.path.join(args.template_dir, args.vars), 'r', encoding='utf8') as f:
+            common_vars = yaml.load(f)
+    else:
+        for common_vars_file in COMMON_VARS_FILES:
+            try:
+                with open(os.path.join(args.template_dir, common_vars_file), 'r', encoding='utf8') as f:
+                    common_vars = yaml.load(f)
+            except FileNotFoundError:
+                pass
 
     update = {}
     if args.update:
@@ -270,7 +304,6 @@ def main():
         undefined=StrictUndefined,
     )
 
-    issues = []
     for filename in sorted(os.listdir(args.template_dir)):
         for issue_type_ext, IssueType in ISSUE_TYPES.items():
             if filename.endswith(issue_type_ext):
@@ -321,24 +354,14 @@ def main():
                             )
                         )
 
-    future_update_arg = json.dumps(dict(map(lambda issue: (issue.name, issue.id), issues)))
-    update_issues_cmd_parts = sys.argv.copy()
-    if args.update:
-        for i, arg in enumerate(update_issues_cmd_parts):
-            if arg == '--update':
-                update_issues_cmd_parts[i + 1] = future_update_arg
-                break
-    else:
-        update_issues_cmd_parts.insert(1, '--update')
-        update_issues_cmd_parts.insert(2, future_update_arg)
-    update_issues_cmd = ' '.join(map(quote, update_issues_cmd_parts))
-    common_vars['update_issues_cmd'] = update_issues_cmd
+    prepare_future_update_cmd(issues, common_vars, args.update)
 
     for issue in issues:
         issue.update()
 
     print('\nTo update existing issues, edit templates/vars, then execute:\n')
-    print(update_issues_cmd)
+    print(common_vars['update_issues_cmd'])
+    print('\nSUCCESS')
 
 
 if __name__ == '__main__':
