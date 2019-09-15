@@ -46,7 +46,7 @@ def jinja_render_recursive(env, what, vars, path):
     elif type(what) == str:
         try:
             result = env.from_string(what).render(vars)
-            JSONMARKER = 'parsejson:'
+            JSONMARKER = '_workflow_templater_parsejson:'
             if result.startswith(JSONMARKER):
                 return json.loads(result[len(JSONMARKER):])
             else:
