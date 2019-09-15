@@ -35,14 +35,36 @@ COMMON_VARS_FILES = (
 )
 
 
-def jinja_render_recursive(env, what, vars, path):
+
+def jinja_render_recursive(env, what, vars, path, updating=False):
     if type(what) == list:
         newlist = []  # not using map here because we need index for error message
+        NO_UPDATE_MARKER = '_workflow_templater_no_update:'
         for i, item in enumerate(what):
-            newlist.append(jinja_render_recursive(env, item, vars, path + ['[{}]'.format(i)]))
+            result = jinja_render_recursive(env, item, vars, path + ['[{}]'.format(i)], updating)
+            try:
+                if result.startswith(NO_UPDATE_MARKER):
+                    if updating:
+                        continue
+                    result = result[len(NO_UPDATE_MARKER):]
+            except AttributeError:
+                pass
+            newlist.append(result)
         return newlist
     elif type(what) == dict:
-        return dict(map(lambda items: (items[0], jinja_render_recursive(env, items[1], vars, path + [items[0]]),), what.items()))
+        newdict = {}
+        NO_UPDATE_MARKER = '_workflow_templater_no_update'
+        for k, v in what.items():
+            new_value = jinja_render_recursive(env, v, vars, path + [k], updating)
+            try:
+                if k.endswith(NO_UPDATE_MARKER):
+                    if updating:
+                        continue
+                    k = k[:-len(NO_UPDATE_MARKER)]
+            except AttributeError:
+                pass
+            newdict[k] = new_value
+        return newdict
     elif type(what) == str:
         try:
             result = env.from_string(what).render(vars)
@@ -85,7 +107,7 @@ def pretty_dump(obj):
         return strio.getvalue()
 
 class Issue:
-    def __init__(self, name, common_vars, additional_vars, data, fromfile, id=None, is_dryrun=False, no_update=False):
+    def __init__(self, name, common_vars, additional_vars, data, fromfile, id=None, is_dryrun=False, no_update=False, updating=False):
         self.name = name
         self.fromfile = fromfile
         self.common_vars = common_vars
@@ -93,6 +115,7 @@ class Issue:
         self.data = data
         self.is_dryrun = is_dryrun
         self.no_update = no_update
+        self.updating = updating
         self.self_key_dict = {}
 
     @property
@@ -114,8 +137,8 @@ class Issue:
 
 
 class JiraIssue(Issue):
-    def __init__(self, name, common_vars, additional_vars, data, fromfile, id=None, is_dryrun=False, no_update=False, jira=None):
-        super().__init__(name, common_vars, additional_vars, data, fromfile, id, is_dryrun, no_update)
+    def __init__(self, name, common_vars, additional_vars, data, fromfile, id=None, is_dryrun=False, no_update=False, updating=False, jira=None):
+        super().__init__(name, common_vars, additional_vars, data, fromfile, id, is_dryrun, no_update, updating)
         self.jira = jira
         self.update_fields = self.data.pop('update', None)
         self.watchers = self.data.pop('watchers', ())
@@ -139,8 +162,8 @@ class JiraIssue(Issue):
     def update(self):
         if self.no_update:
             return
-        fields = jinja_render_recursive(jinja_env_strict, self.data, self.final_vars, [self.fromfile])
-        update = jinja_render_recursive(jinja_env_strict, self.update_fields, self.final_vars, [self.fromfile])
+        fields = jinja_render_recursive(jinja_env_strict, self.data, self.final_vars, [self.fromfile], self.updating)
+        update = jinja_render_recursive(jinja_env_strict, self.update_fields, self.final_vars, [self.fromfile], self.updating)
         if self.is_dryrun:
             pass
             logging.debug('-----{}-----'.format(self.id))
@@ -158,8 +181,8 @@ class JiraIssue(Issue):
 
 
 class EmailIssue(Issue):
-    def __init__(self, name, common_vars, additional_vars, data, fromfile, id=None, is_dryrun=False, no_update=False, smtp=None, user=None, keyring_service=None, email_from=None):
-        super().__init__(name, common_vars, additional_vars, data, fromfile, id, is_dryrun, no_update)
+    def __init__(self, name, common_vars, additional_vars, data, fromfile, id=None, is_dryrun=False, no_update=False, updating=False, smtp=None, user=None, keyring_service=None, email_from=None):
+        super().__init__(name, common_vars, additional_vars, data, fromfile, id, is_dryrun, no_update, updating)
         self.smtp = smtp
         self.user = user
         self.email_from = email_from
@@ -169,7 +192,7 @@ class EmailIssue(Issue):
     def update(self):
         if self.no_update:
             return
-        rendered = jinja_render_recursive(jinja_env_strict, self.data, self.final_vars, [self.fromfile])
+        rendered = jinja_render_recursive(jinja_env_strict, self.data, self.final_vars, [self.fromfile], self.updating)
         self.id = rendered['Message-ID']
         if self.is_dryrun:
             logging.debug('Email: {}'.format(pretty_dump(rendered)))
@@ -364,6 +387,7 @@ def main():
                                 id=update[name] if name in update else None,
                                 is_dryrun=args.dry_run,
                                 no_update=no_update if name in update else False,
+                                updating=name in update,
                                 fromfile=filename,
                                 **type_specific_params,
                             )
