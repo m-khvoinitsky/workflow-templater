@@ -174,7 +174,10 @@ class EmailIssue(Issue):
         if self.is_dryrun:
             logging.debug('Email: {}'.format(pretty_dump(rendered)))
         else:
-            msg = MIMEText(rendered.pop('Body'))
+            if 'Body_html' in rendered:
+                msg = MIMEText(rendered.pop('Body_html'), 'html')
+            else:
+                msg = MIMEText(rendered.pop('Body'), 'plain')
             msg['From'] = self.email_from
             msg['To'] = ', '.join(rendered.pop('To'))
             for h, v in rendered.items():
