@@ -85,13 +85,14 @@ def pretty_dump(obj):
         return strio.getvalue()
 
 class Issue:
-    def __init__(self, name, common_vars, additional_vars, data, fromfile, id=None, is_dryrun=False):
+    def __init__(self, name, common_vars, additional_vars, data, fromfile, id=None, is_dryrun=False, no_update=False):
         self.name = name
         self.fromfile = fromfile
         self.common_vars = common_vars
         self.additional_vars = additional_vars # TODO: remove them? Don't forget about foreach_key and shit
         self.data = data
         self.is_dryrun = is_dryrun
+        self.no_update = no_update
         self.self_key_dict = {}
 
     @property
@@ -113,8 +114,8 @@ class Issue:
 
 
 class JiraIssue(Issue):
-    def __init__(self, name, common_vars, additional_vars, data, fromfile, id=None, is_dryrun=False, jira=None):
-        super().__init__(name, common_vars, additional_vars, data, fromfile, id, is_dryrun)
+    def __init__(self, name, common_vars, additional_vars, data, fromfile, id=None, is_dryrun=False, no_update=False, jira=None):
+        super().__init__(name, common_vars, additional_vars, data, fromfile, id, is_dryrun, no_update)
         self.jira = jira
         self.update_fields = self.data.pop('update', None)
         self.watchers = self.data.pop('watchers', ())
@@ -136,6 +137,8 @@ class JiraIssue(Issue):
             self.id = id
 
     def update(self):
+        if self.no_update:
+            return
         fields = jinja_render_recursive(jinja_env_strict, self.data, self.final_vars, [self.fromfile])
         update = jinja_render_recursive(jinja_env_strict, self.update_fields, self.final_vars, [self.fromfile])
         if self.is_dryrun:
@@ -154,10 +157,9 @@ class JiraIssue(Issue):
                 urlopen_jira_wrap(f'rest/api/2/issue/{self.id}/watchers', 'POST', watcher)
 
 
-
 class EmailIssue(Issue):
-    def __init__(self, name, common_vars, additional_vars, data, fromfile, id=None, is_dryrun=False, smtp=None, user=None, keyring_service=None, email_from=None):
-        super().__init__(name, common_vars, additional_vars, data, fromfile, id, is_dryrun)
+    def __init__(self, name, common_vars, additional_vars, data, fromfile, id=None, is_dryrun=False, no_update=False, smtp=None, user=None, keyring_service=None, email_from=None):
+        super().__init__(name, common_vars, additional_vars, data, fromfile, id, is_dryrun, no_update)
         self.smtp = smtp
         self.user = user
         self.email_from = email_from
@@ -165,7 +167,8 @@ class EmailIssue(Issue):
         self.id = jinja_render_recursive(jinja_env_permissive, self.data, self.final_vars, [self.fromfile])['Message-ID']
 
     def update(self):
-
+        if self.no_update:
+            return
         rendered = jinja_render_recursive(jinja_env_strict, self.data, self.final_vars, [self.fromfile])
         self.id = rendered['Message-ID']
         if self.is_dryrun:
@@ -322,6 +325,7 @@ def main():
                     data = yaml.load(f)
 
                     if_jinja = data.pop('if', None)
+                    no_update = data.pop('no_update', False)
 
                     foreach = data.pop('foreach', (None,))
                     foreach_fromvar = data.pop('foreach_fromvar', None)
@@ -356,6 +360,7 @@ def main():
                                 data=data.copy(),
                                 id=update[name] if name in update else None,
                                 is_dryrun=args.dry_run,
+                                no_update=no_update if name in update else False,
                                 fromfile=filename,
                                 **type_specific_params,
                             )
