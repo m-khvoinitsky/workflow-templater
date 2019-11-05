@@ -180,6 +180,7 @@ email_keyring_service_name: 'MyCorp LDAP'
           date: !!timestamp 2019-10-24 06:30:00.0
         - name: iOS
           date: !!timestamp 2019-10-24 10:50:00.0
+        foreach_namevar: name
         summary: 'Release application for {{ item.name }}'
         ...
         ```
