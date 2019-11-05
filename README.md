@@ -103,9 +103,109 @@ email_keyring_service_name: 'MyCorp LDAP'
 # Template description
 ## Overview
 * Whole workflow template is a directory.
-* There should be one file with variables named `0_common.yaml`, `00_common.yaml` or `common.yaml`.
-* There may be any amount of "issue" files: ending with ".jira.yaml" for jira issue and ending with ".email.yaml" for email.
+* There should be one file with variables named `0_common.yaml`, `00_common.yaml` or `common.yaml`. Alternatively, you can name this file as you wish and specify its name with `--vars` argument.
+* There may be any amount of "issue" files:
+    * ending with ".jira.yaml" for jira issue
+        * All fields in each jira.issue file are send as is to Jira via [API](https://docs.atlassian.com/software/jira/docs/api/REST/latest/#api/2/issue-createIssue) in `fields` fileld with the exception of following fields:
+            * `watchers`: it's impossible to add watchers during create so it handled separately via [this API method](https://docs.atlassian.com/software/jira/docs/api/REST/latest/#api/2/issue-addWatcher).
+            * `update`: its content is sent in `update` via [API](https://docs.atlassian.com/software/jira/docs/api/REST/latest/#api/2/issue-createIssue)
+            * global special fields (see below)
+    * ending with ".email.yaml" for email.
 * Each "issue" file is yaml file where each string value is rendered with [Jinja2](http://jinja.pocoo.org/docs/templates/) using variables from `*common.yaml` file.
+* Special variables available for use in jinja:
+    * `issuekey_self`: Jira issue key or Message-ID of current issue or email.
+    * `issuekey_<name>`: Jira issue key or Message-ID of issue or email named `<name>`. For example, for issue in filename `something.jira.yaml` this variable name would be `issuekey_something` and it can be used in all templates.
+* Global special fields:
+    * `foreach`: list, create one issue per item in this list. List items should be strings or dicts (in case of dicts you must specify `foreach_namevar` too, see below). In case of strings, issuekey_ variable would be named `issuekey_<name>_<list_value>`
+    Example:
+        ```yaml
+        foreach:
+        - Android
+        - iOS
+        summary: 'Release application for {{ item }}'
+        ...
+        ```
+        would finally evaluate to following issues:
+        ```yaml
+        summary: 'Release application for Android'
+        ...
+        ```
+        ```yaml
+        summary: 'Release application for iOS'
+        ...
+        ```
+    * `foreach_fromvar`: if content for `foreach` variable is shared between several templates, it's better to specify it in `*common.yaml` file and specify here the name of the variable in this file. Example:
+        `common.yaml`:
+        ```yaml
+        OSes:
+        - Android
+        - iOS
+        ...
+        ```
+        `build.jira.yaml`:
+        ```yaml
+        foreach_fromvar: OSes
+        summary: 'Build clients for {{ item }}'
+        ...
+        ```
+        `release.jira.yaml`:
+        ```yaml
+        foreach_fromvar: OSes
+        summary: 'Release application for {{ item }}'
+        ...
+        ```
+    * `foreach_key`: if you don't like default variable name (`item`) for each item in `foreach` list, you may specify it here. Example
+        ```yaml
+        foreach:
+        - Android
+        - iOS
+        foreach_key: os
+        summary: 'Release application for {{ os }}'
+        ...
+        ```
+        would finally evaluate to following issues:
+        ```yaml
+        summary: 'Release application for Android'
+        ...
+        ```
+        ```yaml
+        summary: 'Release application for iOS'
+        ...
+        ```
+    * `foreach_namevar`: when foreach is in use, workflow-templater would generate issuekey_ variable name as follows: `issuekey_<name>_<list_value>`. If you use dicts as foreach values, you need to specify key name in this dicts which will be appended to the end of this variable name. Example
+        `release.jira.yaml` file:
+        ```yaml
+        foreach:
+        - name: Android
+          date: !!timestamp 2019-10-24 06:30:00.0
+        - name: iOS
+          date: !!timestamp 2019-10-24 10:50:00.0
+        summary: 'Release application for {{ item.name }}'
+        ...
+        ```
+        Now in any other (or the same) issue you can link to this issues as follows:
+        ```yaml
+        summary: 'Notify community'
+        description: |
+          Android release task: {{ issuekey_release_Android }}
+          iOS release task: {{ issuekey_release_iOS }}
+        ```
+    * `if`: if this variable value evaluates to empty string (`''`), `false` or `no`, this template will be completely ignored. Note: value for this variable is calculated for each item separately when `foreach` or `foreach_fromvar` is in use.
+    Example:
+        ```yaml
+        foreach:
+        - Android
+        - iOS
+        foreach_key: os
+        if: '{{ os in ["Android", "GNU/Linux"] }}'
+        summary: 'Release application for {{ os }}'
+        ...
+        ```
+        would finally evaluate to following issue (only one, obviously):
+        ```yaml
+        summary: 'Release application for Android'
+        ...
+        ```
 
 ## Examples
 See [basic release example](https://github.com/m-khvoinitsky/workflow-templater/tree/master/examples/basic_release_example) for basic example.
