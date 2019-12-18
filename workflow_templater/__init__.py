@@ -83,6 +83,30 @@ def jinja_render_recursive(env, what, vars, path, updating=False):
         return what
 
 
+ASKMARKER = '_workflow_templater_ask:'
+def process_vars(v, label):
+    if isinstance(v, str):
+        if v.startswith(ASKMARKER):
+            type_ = v.replace(ASKMARKER, '')
+            if type_ == 'bool':
+                v = input(f'{label} (y/yes/n/no)?: ').strip().lower() in ('y', 'yes',)
+            elif type_ == 'str':
+                v = input(f'{label} (enter value): ')
+            else:
+                raise Exception(f'unknown type for {ASKMARKER} {type_}')
+            return v
+        else:
+            return v
+    elif isinstance(v, list):
+        newlist = []
+        for index, item in enumerate(v):
+            newlist.append(process_vars(item, f'{label}[{index}]'))
+        return newlist
+    elif isinstance(v, dict):
+        return dict(map(lambda t: (t[0], process_vars(t[1], f'{label}.{t[0]}')), v.items()))
+    else:
+        return v
+
 def pretty_dump(obj):
     yaml = ruamel.yaml.YAML(typ='rt')
     yaml.indent(mapping=2, sequence=2, offset=0)
