@@ -353,7 +353,7 @@ def main():
                     if_jinja = data.pop('if', None)
                     no_update = data.pop('no_update', False)
 
-                    foreach = data.pop('foreach', (None,))
+                    foreach = jinja_render_recursive(jinja_env_strict, data.pop('foreach', (None,)), common_vars, [filename, 'if'])
                     foreach_fromvar = data.pop('foreach_fromvar', None)
                     if foreach_fromvar is not None:
                         foreach = common_vars[foreach_fromvar]  # should crash if not exists
