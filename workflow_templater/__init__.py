@@ -348,6 +348,9 @@ def main():
             except FileNotFoundError:
                 pass
 
+    common_vars = process_vars(common_vars, 'common_vars')
+    logging.debug((f'-- common_vars --\n\n{pretty_dump(common_vars)}'))
+
     update = {}
     if args.update:
         update = json.loads(args.update)
