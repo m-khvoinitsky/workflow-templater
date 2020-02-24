@@ -35,36 +35,56 @@ COMMON_VARS_FILES = (
     'common.yaml',
 )
 
+class Continue(Exception):
+    pass
 
-
-def jinja_render_recursive(env, what, vars, path, updating=False):
+# This marker is used to exclude some fields from updating (for example, in case when it's needed
+# to preserve human's changes). However, during issue creation, there will be an attempt to update
+# them (to make sure that all required variables have been gathered). To avoid even the very first
+# update, there is the following marker (with "force"). It is useful if, for example, you do not have
+# permissions to update certain fields so you can only create an issue with them pre-filled.
+NO_UPDATE_MARKER = '_workflow_templater_no_update'
+FORCE_NO_UPDATE_MARKER = '_workflow_templater_force_no_update'
+def jinja_render_recursive(env, what, vars, path, updating_while_creating=False, updating=False):
     if type(what) == list:
         newlist = []  # not using map here because we need index for error message
-        NO_UPDATE_MARKER = '_workflow_templater_no_update:'
         for i, item in enumerate(what):
-            result = jinja_render_recursive(env, item, vars, path + ['[{}]'.format(i)], updating)
             try:
-                if result.startswith(NO_UPDATE_MARKER):
-                    if updating:
-                        continue
-                    result = result[len(NO_UPDATE_MARKER):]
-            except AttributeError:
+                result = jinja_render_recursive(env, item, vars, path + ['[{}]'.format(i)], updating_while_creating)
+                try:
+                    for marker, situation in (
+                        (f'{NO_UPDATE_MARKER}:', updating_while_creating),
+                        (f'{FORCE_NO_UPDATE_MARKER}:', updating),
+                    ):
+                        if result.startswith(marker):
+                            if situation:
+                                raise Continue()
+                            result = result[len(marker):]
+                except AttributeError:
+                    pass
+                newlist.append(result)
+            except Continue:
                 pass
-            newlist.append(result)
         return newlist
     elif type(what) == dict:
         newdict = {}
-        NO_UPDATE_MARKER = '_workflow_templater_no_update'
         for k, v in what.items():
-            new_value = jinja_render_recursive(env, v, vars, path + [k], updating)
             try:
-                if k.endswith(NO_UPDATE_MARKER):
-                    if updating:
-                        continue
-                    k = k[:-len(NO_UPDATE_MARKER)]
-            except AttributeError:
+                new_value = jinja_render_recursive(env, v, vars, path + [k], updating_while_creating)
+                try:
+                    for marker, situation in (
+                        (NO_UPDATE_MARKER, updating_while_creating),
+                        (FORCE_NO_UPDATE_MARKER, updating),
+                    ):
+                        if k.endswith(marker):
+                            if situation:
+                                raise Continue()
+                            k = k[:-len(marker)]
+                except AttributeError:
+                    pass
+                newdict[k] = new_value
+            except Continue:
                 pass
-            newdict[k] = new_value
         return newdict
     elif type(what) == str:
         try:
@@ -165,8 +185,8 @@ class JiraIssue(Issue):
     def update(self):
         if self.no_update:
             return
-        fields = jinja_render_recursive(jinja_env_strict, self.data, self.final_vars, [self.fromfile], self.updating)
-        update = jinja_render_recursive(jinja_env_strict, self.update_fields, self.final_vars, [self.fromfile], self.updating)
+        fields = jinja_render_recursive(jinja_env_strict, self.data, self.final_vars, [self.fromfile], self.updating, True)
+        update = jinja_render_recursive(jinja_env_strict, self.update_fields, self.final_vars, [self.fromfile], self.updating, True)
         if self.is_dryrun:
             pass
             logging.info('-----{}-----'.format(self.id))
@@ -202,7 +222,7 @@ class EmailIssue(Issue):
     def update(self):
         if self.no_update:
             return
-        rendered = jinja_render_recursive(jinja_env_strict, self.data, self.final_vars, [self.fromfile], self.updating)
+        rendered = jinja_render_recursive(jinja_env_strict, self.data, self.final_vars, [self.fromfile], self.updating, True)
         self.id = rendered['Message-ID']
         if self.is_dryrun:
             logging.info('Email: {}'.format(pretty_dump(rendered)))
@@ -381,6 +401,7 @@ def main():
 
                     if_jinja = data.pop('if', None)
                     no_update = data.pop('no_update', False)
+                    force_no_update = data.pop('force_no_update', False)
 
                     foreach = jinja_render_recursive(jinja_env_strict, data.pop('foreach', (None,)), common_vars, [filename, 'if'])
                     foreach_fromvar = data.pop('foreach_fromvar', None)
@@ -415,7 +436,7 @@ def main():
                                 data=data.copy(),
                                 id=update[name] if name in update else None,
                                 is_dryrun=args.dry_run,
-                                no_update=no_update if name in update else False,
+                                no_update=force_no_update if force_no_update else (no_update if name in update else False),
                                 updating=name in update,
                                 fromfile=filename,
                                 **type_specific_params,
