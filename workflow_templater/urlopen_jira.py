@@ -23,7 +23,7 @@ from getpass import getpass
 from urllib.request import urlopen, Request
 from urllib.parse import urljoin
 from urllib.error import HTTPError
-from functools import partial
+from .common import pretty_dump
 
 
 def get_password(service_name, user, overwrite=False):
@@ -72,6 +72,7 @@ def get_cookie(password_service, user, jira_base, overwrite=False):
 def urlopen_jira(url, method='GET', data=None, user=None, keyring_service=None, jira_base=None):
     if jira_base is None:
         raise Exception('jira_base is required')
+    final_url = urljoin(jira_base, url)
     debugdata = data
     try:
         debugdata = data.copy()
@@ -81,7 +82,7 @@ def urlopen_jira(url, method='GET', data=None, user=None, keyring_service=None, 
         pass
     except AttributeError:
         pass
-    logging.debug('%s %s %s %s', url, user, method, debugdata)
+    logging.debug('%s %s %s %s', final_url, user, method, debugdata)
 
     bad_cookies = False
     for _ in range(3):
@@ -93,7 +94,7 @@ def urlopen_jira(url, method='GET', data=None, user=None, keyring_service=None, 
                 headers['Cookie'] = get_cookie(keyring_service, user, jira_base=jira_base, overwrite=bad_cookies)
             res_obj = urlopen(
                 Request(
-                    urljoin(jira_base, url),
+                    final_url,
                     data=json.dumps(data).encode() if data is not None else None,
                     headers=headers,
                     method=method
@@ -103,15 +104,20 @@ def urlopen_jira(url, method='GET', data=None, user=None, keyring_service=None, 
         except HTTPError as e:
             if e.code == 401 and user is not None:
                 bad_cookies = True
-                logging.info('Bad cookies, refreshing...')
+                logging.info('Expired cookies, refreshing...')
                 continue
-            logging.error('%s %s %s', e.code, e.reason, e.read())
+            error_data = e.read()
+            try:
+                error_data_parsed = json.loads(error_data)
+                logging.error('during %s to %s: %s %s\n%s', method, final_url, e.code, e.reason, pretty_dump(error_data_parsed))
+            except json.JSONDecodeError:
+                logging.error('during %s to %s: %s %s %s', method, final_url, e.code, e.reason, error_data)
             raise e
         if res_obj.code == 204:  # No Content
             return None, res_obj
         else:
             result = json.load(res_obj)  # json.loads(res_obj.read().decode('utf-8'))
-            logging.debug(result)
+            logging.debug(pretty_dump(result))
             return result, res_obj
 
         raise Exception('This code should have never been reached')

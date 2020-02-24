@@ -6,7 +6,6 @@ import os
 import argparse
 import logging
 import json
-from io import StringIO
 from shlex import quote
 from functools import partial
 from itertools import chain
@@ -15,10 +14,12 @@ if __name__ == '__main__':
     from urlopen_jira import urlopen_jira, get_password
     from our_jinja import OurJinjaEnvironment, OurJinjaLoader
     from quote_windows import escape_cmd, escape_ps
+    from common import pretty_dump
 else:
     from .urlopen_jira import urlopen_jira, get_password
     from .our_jinja import OurJinjaEnvironment, OurJinjaLoader
     from .quote_windows import escape_cmd, escape_ps
+    from .common import pretty_dump
 from jinja2 import StrictUndefined, DebugUndefined
 import datetime
 import smtplib
@@ -107,28 +108,6 @@ def process_vars(v, label):
     else:
         return v
 
-def pretty_dump(obj):
-    yaml = ruamel.yaml.YAML(typ='rt')
-    yaml.indent(mapping=2, sequence=2, offset=0)
-    yaml.width = 99999
-    def make_good_strings(obj):
-        if type(obj) == list:
-            return list(map(make_good_strings, obj))
-        elif type(obj) == dict:
-            return dict(map(lambda items: (items[0], make_good_strings(items[1]),), obj.items()))
-        elif type(obj) == str:
-            if obj.count('\n') > 0:
-                return ruamel.yaml.scalarstring.LiteralScalarString(
-                    '\n'.join(map(lambda x: x.rstrip(), obj.splitlines()))
-                )
-            else:
-                return obj
-        else:
-            return obj
-
-    with StringIO() as strio:
-        yaml.dump(make_good_strings(obj), stream=strio)
-        return strio.getvalue()
 
 class Issue:
     def __init__(self, name, common_vars, additional_vars, data, fromfile, id=None, is_dryrun=False, no_update=False, updating=False):
@@ -171,10 +150,10 @@ class JiraIssue(Issue):
             fields = jinja_render_recursive(jinja_env_permissive, self.data, self.final_vars, [self.fromfile])
             if self.is_dryrun:
                 self.id = f'FAKE_JIRA_KEY-{ name }'
-                logging.debug(pretty_dump(fields))
+                logging.info(pretty_dump(fields))
             else:
                 # create issue
-                logging.debug('creating issue for %s', name)
+                logging.info('creating issue for %s', name)
                 result, _ = urlopen_jira_wrap('rest/api/2/issue/', 'POST', {
                     'fields': fields,
                 })
@@ -190,17 +169,19 @@ class JiraIssue(Issue):
         update = jinja_render_recursive(jinja_env_strict, self.update_fields, self.final_vars, [self.fromfile], self.updating)
         if self.is_dryrun:
             pass
-            logging.debug('-----{}-----'.format(self.id))
-            logging.debug(pretty_dump(fields))
+            logging.info('-----{}-----'.format(self.id))
+            logging.info(pretty_dump(fields))
             if update:
-                logging.debug(pretty_dump(update))
-            logging.debug(pretty_dump({'watchers': self.watchers}))
+                logging.info(pretty_dump(update))
+            logging.info(pretty_dump({'watchers': self.watchers}))
         else:
+            logging.info('updating issue %s %s', self.id, self.name)
             urlopen_jira_wrap(f'rest/api/2/issue/{self.id}', 'PUT', {
                 'fields': fields,
                 'update': update,
             })
             for watcher in self.watchers:
+                logging.info('adding watcher %s to %s %s', watcher, self.id, self.name)
                 urlopen_jira_wrap(f'rest/api/2/issue/{self.id}/watchers', 'POST', watcher)
 
 
@@ -219,8 +200,9 @@ class EmailIssue(Issue):
         rendered = jinja_render_recursive(jinja_env_strict, self.data, self.final_vars, [self.fromfile], self.updating)
         self.id = rendered['Message-ID']
         if self.is_dryrun:
-            logging.debug('Email: {}'.format(pretty_dump(rendered)))
+            logging.info('Email: {}'.format(pretty_dump(rendered)))
         else:
+            logging.info('sending email from %s', self.name)
             if 'Body_html' in rendered:
                 msg = MIMEText(rendered.pop('Body_html'), 'html')
             else:
@@ -236,6 +218,7 @@ class EmailIssue(Issue):
                 # TODO: handle bad password here
                 logging.debug(s.login(self.user, get_password(self.keyring_service, self.user)))
                 s.send_message(msg)
+            logging.info('sent email from %s\nSubject: %s\nTo: %s\nMessage-Id: %s', self.name, msg['Subject'] if 'Subject' in msg else 'empty', msg['To'] if 'To' in msg else 'no one', msg['Message-Id'] if 'Message-Id' in msg else 'empty')
 
 ISSUE_TYPES = {
     '.jira.yaml': JiraIssue,
@@ -253,15 +236,24 @@ def prepare_future_update_cmd(issues, common_vars, updating):
     else:
         update_issues_cmd_parts.insert(0, '--update')
         update_issues_cmd_parts.insert(1, future_update_arg)
+    cmd_cmd = ' '.join(chain((os.path.basename(sys.argv[0]),), map(escape_cmd, update_issues_cmd_parts)))
+    powershell_cmd = ' '.join((os.path.basename(sys.argv[0]), escape_ps(update_issues_cmd_parts),))
+    unixshell_cmd = ' '.join(chain((sys.argv[0],), map(quote, update_issues_cmd_parts)))
     update_issues_cmd = '\n'.join((
-        '', 'For cmd.exe:',
-        ' '.join(chain((os.path.basename(sys.argv[0]),), map(escape_cmd, update_issues_cmd_parts))),
-        '', 'For Powershell:',
-        ' '.join((os.path.basename(sys.argv[0]), escape_ps(update_issues_cmd_parts),)),
-        '', 'For UNIX Shell:',
-        ' '.join(chain((sys.argv[0],), map(quote, update_issues_cmd_parts))),
+        '', 'For cmd.exe:', cmd_cmd,
+        '', 'For Powershell:', powershell_cmd,
+        '', 'For UNIX Shell:', unixshell_cmd,
     ))
     common_vars['update_issues_cmd'] = update_issues_cmd
+    # Warning: parent shell detection here is very unreliable, for example, it will fail inside cygwin
+    if os.name == 'nt' and 'PROMPT' in os.environ:  # hacky way to detect cmd.exe
+        return cmd_cmd
+    elif os.name == 'nt':  # if we're not inside cmd.exe, let's assume that we're inside powershell
+        return powershell_cmd
+    elif os.name == 'posix':  # inside unix shell
+        return unixshell_cmd
+    else:
+        return update_issues_cmd
 
 def main():
     parser = argparse.ArgumentParser(description='Workflow Templater', formatter_class=argparse.RawTextHelpFormatter)
@@ -322,17 +314,19 @@ def main():
     urlopen_jira_wrap = partial(urlopen_jira, user=args.jira_user, jira_base=args.jira, keyring_service=args.jira_keyring_service_name)
 
     logging.basicConfig(
-        level=logging.DEBUG if args.verbose else logging.WARNING,
+        level=logging.DEBUG if args.verbose else logging.INFO,
         format='%(levelname)s %(message)s'
     )
     issues = []
     common_vars = {}
     def excepthook(exc_type, exc_value, exc_traceback):
-        logging.error("Unhandled exception", exc_info=(exc_type, exc_value, exc_traceback,))
+        if args.verbose:
+            logging.error("Unhandled exception", exc_info=(exc_type, exc_value, exc_traceback,))
+        else:
+            logging.error("Unhandled exception: {}".format(repr(exc_value)))
         if issues:
-            prepare_future_update_cmd(issues, common_vars, args.update)
             print('\nError happened, but some issues have already been created. To update existing issues, edit templates/vars, then execute:\n')
-            print(common_vars['update_issues_cmd'])
+            print(prepare_future_update_cmd(issues, common_vars, args.update))
             print('\nFAIL')
 
     sys.excepthook = excepthook
@@ -420,13 +414,13 @@ def main():
                             )
                         )
 
-    prepare_future_update_cmd(issues, common_vars, args.update)
+    future_cmd_short = prepare_future_update_cmd(issues, common_vars, args.update)
 
     for issue in issues:
         issue.update()
 
     print('\nTo update existing issues, edit templates/vars, then execute:\n')
-    print(common_vars['update_issues_cmd'])
+    print(future_cmd_short)
     print('\nSUCCESS')
 
 
