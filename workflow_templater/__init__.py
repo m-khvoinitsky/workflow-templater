@@ -208,7 +208,10 @@ class EmailIssue(Issue):
             else:
                 msg = MIMEText(rendered.pop('Body'), 'plain')
             msg['From'] = self.email_from
-            msg['To'] = ', '.join(rendered.pop('To'))
+            for header in ('To', 'Cc', 'Bcc',):
+                if header in rendered:
+                    msg[header] = ', '.join(rendered.pop(header))
+
             for h, v in rendered.items():
                 if v:
                     msg[h] = v
