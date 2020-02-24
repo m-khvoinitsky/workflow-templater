@@ -23,7 +23,11 @@ from getpass import getpass
 from urllib.request import urlopen, Request
 from urllib.parse import urljoin
 from urllib.error import HTTPError
-from .common import pretty_dump
+try:
+    from .common import pretty_dump
+except ImportError:
+    # preserve ability to launch __main__.py directly
+    from common import pretty_dump
 
 
 def get_password(service_name, user, overwrite=False):
