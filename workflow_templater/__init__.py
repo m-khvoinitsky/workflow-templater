@@ -175,11 +175,16 @@ class JiraIssue(Issue):
                 logging.info(pretty_dump(update))
             logging.info(pretty_dump({'watchers': self.watchers}))
         else:
-            logging.info('updating issue %s %s', self.id, self.name)
-            urlopen_jira_wrap(f'rest/api/2/issue/{self.id}', 'PUT', {
-                'fields': fields,
-                'update': update,
-            })
+            if type(update) != list:
+                # some actions in jira, despite being a list, may contain only one item, for example "issuelinks"
+                # that's why we need to be able to perform several update actions with different data
+                update = [update]
+            for i, u in enumerate(update):
+                logging.info('updating issue %s (%s) %s', self.id, i + 1, self.name)
+                urlopen_jira_wrap(f'rest/api/2/issue/{self.id}', 'PUT', {
+                    'fields': fields,
+                    'update': u,
+                })
             for watcher in self.watchers:
                 logging.info('adding watcher %s to %s %s', watcher, self.id, self.name)
                 urlopen_jira_wrap(f'rest/api/2/issue/{self.id}/watchers', 'POST', watcher)
