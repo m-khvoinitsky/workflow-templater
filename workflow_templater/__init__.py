@@ -299,8 +299,12 @@ def main():
     parser.add_argument('--email-from', type=str)
     default_config_path = os.path.join(user_config_dir('workflow-templater', roaming=True), 'config.yaml')
     parser.add_argument('--config', type=str, default=default_config_path, help='overwrite config file path, default is {}'.format(default_config_path))
+    parser.add_argument('--print-config-path', action='store_true', help='print config file path and exit')
     parser.add_argument('template_dir', type=str, help='path to dir with templates')
     args = parser.parse_args()
+    if args.print_config_path:
+        print(args.config)
+        sys.exit(0)
     if args.config:
         try:
             with open(os.path.expanduser(args.config), 'r', encoding='utf8') as f:
