@@ -111,6 +111,17 @@ email_keyring_service_name: 'MyCorp LDAP'
             * `update`: its content is sent in `update` via [API](https://docs.atlassian.com/software/jira/docs/api/REST/latest/#api/2/issue-createIssue)
             * global special fields (see below)
     * ending with ".email.yaml" for email.
+* There may be optional file named `mutate.py` with function `mutate` which accepts variables, modifies them and returns the result wich can be used in templates.
+
+  Basic example:
+  ```python
+  def mutate(variables):
+      variables['new_variable'] = f'{variables["old_var1"]} and {variables["old_var2"]}'
+      return variables
+  ```
+
+  Security note: if you concerned that this feature introduces an ability to execute arbitrary code from the templates, that's correct. However, this is also possible with bare jinja templates (see [https://github.com/pallets/jinja/issues/549](https://github.com/pallets/jinja/issues/549)), so you should make sure that your templates come from trusted sources anyway.
+
 * Each "issue" file is yaml file where each string value is rendered with [Jinja2](http://jinja.pocoo.org/docs/templates/) using variables from `*common.yaml` file.
 * Special variables available for use in jinja:
     * `issuekey_self`: Jira issue key or Message-ID of current issue or email.

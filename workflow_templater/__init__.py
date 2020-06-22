@@ -23,6 +23,7 @@ else:
 from jinja2 import StrictUndefined, DebugUndefined
 import datetime
 import smtplib
+import importlib.util
 from email.mime.text import MIMEText
 from appdirs import user_config_dir
 
@@ -375,6 +376,12 @@ def main():
                 pass
 
     common_vars = process_vars(common_vars, 'common_vars')
+    mutate_pyfile = os.path.join(args.template_dir, 'mutate.py')
+    if os.path.isfile(mutate_pyfile):
+        spec = importlib.util.spec_from_file_location("mutate_module", mutate_pyfile)
+        mutate_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mutate_module)
+        common_vars = mutate_module.mutate(common_vars)
     logging.debug((f'-- common_vars --\n\n{pretty_dump(common_vars)}'))
 
     update = {}
