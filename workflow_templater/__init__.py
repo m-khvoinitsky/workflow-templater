@@ -403,22 +403,19 @@ def main():
                     no_update = data.pop('no_update', False)
                     force_no_update = data.pop('force_no_update', False)
 
-                    foreach = jinja_render_recursive(jinja_env_strict, data.pop('foreach', (None,)), common_vars, [filename, 'if'])
+                    foreach = jinja_render_recursive(jinja_env_strict, data.pop('foreach', (None,)), common_vars, [filename, 'foreach'])
                     foreach_fromvar = data.pop('foreach_fromvar', None)
                     if foreach_fromvar is not None:
                         foreach = common_vars[foreach_fromvar]  # should crash if not exists
                     foreach_key = data.pop('foreach_key', 'item')
                     foreach_namevar = data.pop('foreach_namevar', None)
-                    for item in foreach:
-                        if item is not None and foreach_namevar is None and type(item) != str:
-                            logging.critical("{}: Items in foreach are not strings, if it's a dict, you should use 'foreach_namevar' variable".format(filename))
-                            sys.exit(1)
+                    for i, item in enumerate(foreach):
                         name = '_'.join(
                             filter(
                                 None,
                                 (
                                     filename.replace(issue_type_ext, ''),
-                                    item if foreach_namevar is None else item[foreach_namevar],
+                                    (item if (type(item) == str or item is None) else str(i)) if foreach_namevar is None else item[foreach_namevar],
                                 )
                             )
                         )  # hard to read?
