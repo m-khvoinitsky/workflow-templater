@@ -356,7 +356,7 @@ def main():
         if args.verbose:
             logging.error("Unhandled exception", exc_info=(exc_type, exc_value, exc_traceback,))
         else:
-            logging.error("Unhandled exception: {}".format(repr(exc_value)))
+            logging.error("Unhandled exception {}: {}".format(exc_type.__name__, str(exc_value)))
         if issues:
             print('\nError happened, but some issues have already been created. To update existing issues, edit templates/vars, then execute:\n')
             print(prepare_future_update_cmd(issues, common_vars, args.update))
