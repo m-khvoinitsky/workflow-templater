@@ -188,13 +188,14 @@ class JiraIssue(Issue):
             return
         fields = jinja_render_recursive(jinja_env_strict, self.data, self.final_vars, [self.fromfile], self.updating, True)
         update = jinja_render_recursive(jinja_env_strict, self.update_fields, self.final_vars, [self.fromfile], self.updating, True)
+        watchers = jinja_render_recursive(jinja_env_strict, self.watchers, self.final_vars, [self.fromfile], self.updating, True)
         if self.is_dryrun:
             pass
             logging.info('-----{}-----'.format(self.id))
             logging.info(pretty_dump(fields))
             if update:
                 logging.info(pretty_dump(update))
-            logging.info(pretty_dump({'watchers': self.watchers}))
+            logging.info(pretty_dump({'watchers': watchers}))
         else:
             if type(update) != list:
                 # some actions in jira, despite being a list, may contain only one item, for example "issuelinks"
@@ -206,7 +207,7 @@ class JiraIssue(Issue):
                     'fields': fields,
                     'update': u,
                 })
-            for watcher in self.watchers:
+            for watcher in watchers:
                 logging.info('adding watcher %s to %s %s', watcher, self.id, self.name)
                 urlopen_jira_wrap(f'rest/api/2/issue/{self.id}/watchers', 'POST', watcher)
 
