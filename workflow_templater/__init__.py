@@ -302,6 +302,7 @@ def main():
     default_config_path = os.path.join(user_config_dir('workflow-templater', roaming=True), 'config.yaml')
     parser.add_argument('--config', type=str, default=default_config_path, help='overwrite config file path, default is {}'.format(default_config_path))
     parser.add_argument('--print-config-path', action='store_true', help='print config file path and exit')
+    parser.add_argument('--access-token', type=str, default=None)
     parser.add_argument('template_dir', type=str, help='path to dir with templates')
     args = parser.parse_args()
     if args.print_config_path:
@@ -345,7 +346,8 @@ def main():
         args.email_keyring_service_name = args.email_smtp
 
     global urlopen_jira_wrap  # get rid of it?
-    urlopen_jira_wrap = partial(urlopen_jira, user=args.jira_user, jira_base=args.jira, keyring_service=args.jira_keyring_service_name)
+    urlopen_jira_wrap = partial(urlopen_jira, user=args.jira_user, jira_base=args.jira,
+                                keyring_service=args.jira_keyring_service_name, access_token=args.access_token)
 
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,

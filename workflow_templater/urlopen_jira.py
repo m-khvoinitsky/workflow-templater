@@ -73,7 +73,7 @@ def get_cookie(password_service, user, jira_base, overwrite=False):
     return cookies
 
 
-def urlopen_jira(url, method='GET', data=None, user=None, keyring_service=None, jira_base=None):
+def urlopen_jira(url, method='GET', data=None, user=None, keyring_service=None, jira_base=None, access_token=None):
     if jira_base is None:
         raise Exception('jira_base is required')
     final_url = urljoin(jira_base, url)
@@ -94,8 +94,11 @@ def urlopen_jira(url, method='GET', data=None, user=None, keyring_service=None, 
             headers = {
                 'Content-Type': 'application/json',
             }
-            if user is not None:
+            if access_token is not None:
+                headers["Authorization"] = f"Bearer {access_token}"
+            elif user is not None:
                 headers['Cookie'] = get_cookie(keyring_service, user, jira_base=jira_base, overwrite=bad_cookies)
+
             res_obj = urlopen(
                 Request(
                     final_url,
