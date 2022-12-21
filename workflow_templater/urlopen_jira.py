@@ -58,7 +58,7 @@ def get_cookie(password_service, user, jira_base, overwrite=False):
                 )
                 logging.debug(data)
                 for k, v in res_obj.headers.items():
-                    if k == 'Set-Cookie':
+                    if isinstance(k, str) and k.lower() == 'set-cookie':
                         cookie_parts.append(v.split(';')[0])
                 cookies = '; '.join(cookie_parts)
                 keyring.set_password(cookies_service, user, cookies)
