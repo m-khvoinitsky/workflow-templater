@@ -12,7 +12,7 @@ Template engine for (currently) Jira and Email. Uses yaml and jinja2. It helps y
   - [macOS](#macos)
   - [Anything else (GNU/Linux, Cygwin, *nix, etc)](#anything-else-gnulinux-cygwin-nix-etc)
     - [Using pip](#using-pip)
-    - [Using eggsecutable](#using-eggsecutable)
+    - [Using pipx](#using-pipx)
     - [From source](#from-source)
 - [Usage](#usage)
 - [Configuration](#configuration)
@@ -31,9 +31,9 @@ Template engine for (currently) Jira and Email. Uses yaml and jinja2. It helps y
 4. (Optional, recommended) Install [Windows Terminal](https://github.com/Microsoft/Terminal) and use it instead of default console.
 
 ## macOS
-1. Install python ≥ 3.7.
+1. Install python ≥ 3.10.
     * Using official Python installer:
-        1. Install python ≥ 3.7 from <https://python.org/> ("macOS 64-bit installer")
+        1. Install python ≥ 3.10 from <https://python.org/> ("macOS 64-bit installer")
         2. Install CA certificates for python, execute in Terminal:
             ```
             /Applications/Python\ 3.7/Install\ Certificates.command
@@ -48,17 +48,15 @@ Template engine for (currently) Jira and Email. Uses yaml and jinja2. It helps y
     ```
 ## Anything else (GNU/Linux, Cygwin, *nix, etc)
 ### Using pip
-1. Make sure that python ≥ 3.7 is installed
+1. Make sure that python ≥ 3.10 is installed
 2.
     ```sh
     pip3 install workflow-templater
     ```
-### Using eggsecutable
-1. Download workflow_templater-${version}-py3.x.egg from the latest release on [Releases page](https://github.com/m-khvoinitsky/workflow-templater/releases).
-2. You can execute it directly or with `/bin/sh` (if you have compatible python and dependencies installed):
+### Using pipx
+1.
     ```sh
-    ./workflow_templater-${version}-py3.x.egg --help
-    sh ./workflow_templater-${version}-py3.x.egg --help
+    pipx run workflow-templater
     ```
 ### From source
 1. Clone this repo

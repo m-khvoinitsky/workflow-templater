@@ -10,7 +10,7 @@ with open('README.md', 'r') as f:
 
 setup(
     name="workflow_templater",
-    version=os.environ.get('TRAVIS_TAG', '0.0'),
+    version=os.environ.get('GITHUB_REF_NAME', '0.0'),
     packages=find_packages(),
     install_requires=requirements,
     zip_safe=True,
