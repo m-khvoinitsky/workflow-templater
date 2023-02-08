@@ -10,7 +10,7 @@ cffi==1.15.1
     # via
     #   -r requirements.in
     #   cryptography
-cryptography==38.0.4
+cryptography==39.0.1
     # via
     #   -r requirements.in
     #   secretstorage
@@ -45,8 +45,6 @@ pycparser==2.21
     #   cffi
 ruamel-yaml==0.17.21
     # via -r requirements.in
-ruamel-yaml-clib==0.2.7
-    # via ruamel-yaml
 secretstorage==3.3.3
     # via
     #   -r requirements.in
