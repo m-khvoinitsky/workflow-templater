@@ -26,6 +26,7 @@ markupsafe==2.1.1
     # via jinja2
 more-itertools==9.0.0
     # via jaraco-classes
+natsort==8.3.1
 pycparser==2.21
     # via cffi
 ruamel-yaml==0.17.21
