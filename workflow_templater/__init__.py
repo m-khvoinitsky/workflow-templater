@@ -26,6 +26,7 @@ import smtplib
 import importlib.util
 from email.mime.text import MIMEText
 from appdirs import user_config_dir
+from natsort import natsorted
 
 
 yaml = ruamel.yaml.YAML(typ='safe')
@@ -403,7 +404,7 @@ def main():
         undefined=StrictUndefined,
     )
 
-    for filename in sorted(os.listdir(args.template_dir)):
+    for filename in natsorted(os.listdir(args.template_dir)):
         for issue_type_ext, IssueType in ISSUE_TYPES.items():
             if filename.endswith(issue_type_ext):
                 if IssueType == JiraIssue:
