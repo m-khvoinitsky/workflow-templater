@@ -95,7 +95,10 @@ def urlopen_jira(url, method='GET', data=None, user=None, keyring_service=None, 
                 'Content-Type': 'application/json',
             }
             if access_token is not None:
-                headers["Authorization"] = f"Bearer {access_token}"
+                if jira_base.endswith('atlassian.net'):
+                    headers["Authorization"] = f"Basic {access_token}"
+                else:
+                    headers["Authorization"] = f"Bearer {access_token}"
             elif user is not None:
                 headers['Cookie'] = get_cookie(keyring_service, user, jira_base=jira_base, overwrite=bad_cookies)
 
