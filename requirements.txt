@@ -10,7 +10,7 @@ cffi==1.15.1
     # via
     #   -r requirements.in
     #   cryptography
-cryptography==38.0.4
+cryptography==39.0.1
     # via
     #   -r requirements.in
     #   secretstorage
