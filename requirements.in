@@ -1,5 +1,7 @@
 appdirs
 jinja2
 keyring
+# required for keyring on Windows
+pywin32-ctypes; sys_platform == 'win32'
 natsort
 ruamel-yaml
