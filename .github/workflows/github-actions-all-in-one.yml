@@ -12,10 +12,11 @@ jobs:
         uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
-          python-version: '3.10'
+          python-version: '3.11'
       - name: install deps
         run: 'sudo apt update && sudo apt install nsis && pip install wheel pynsist && pip install -r requirements.in -c requirements.txt'
       - run: 'sed -i -e "s/^version=0\\.0$/version=${GITHUB_REF_NAME}/g" pynsist.cfg'
+      - run: "python -c 'import textwrap; new_content = open(\"pynsist.cfg\", \"r\", encoding=\"utf-8\").read().replace(\"WHEELS_REPLACEME\", textwrap.indent(\"\\n\".join(filter(lambda l: \"#\" not in l, open(\"requirements.txt\", \"r\", encoding=\"utf-8\").read().splitlines())), \"    \")); open(\"pynsist.cfg\", \"w\", encoding=\"utf-8\").write(new_content)'"
       - name: basic test
         run: './workflow_templater/__init__.py --dry-run --verbose ./examples/basic_release_example/'
       - name: build Windows installer
