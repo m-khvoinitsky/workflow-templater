@@ -42,7 +42,7 @@ def get_password(service_name, user, overwrite=False):
 def get_cookie(password_service, user, jira_base, overwrite=False):
     cookies_service = '{}_{}_cookies'.format('workflow-templater', re.sub(r'[^a-z0-9]+', '_', jira_base).strip('_'))
     cookies = keyring.get_password(cookies_service, user)
-    if cookies is None or overwrite:
+    if cookies is None or cookies.strip() == '' or overwrite:
         wrong_password = False
         for _ in range(3):
             try:
@@ -60,6 +60,9 @@ def get_cookie(password_service, user, jira_base, overwrite=False):
                 for k, v in res_obj.headers.items():
                     if isinstance(k, str) and k.lower() == 'set-cookie':
                         cookie_parts.append(v.split(';')[0])
+                if len(cookie_parts) == 0:
+                    logging.warning(f"Haven't received cookies in the response, seen headers: {list(res_obj.headers.keys())}")
+                    continue
                 cookies = '; '.join(cookie_parts)
                 keyring.set_password(cookies_service, user, cookies)
                 break
@@ -68,7 +71,7 @@ def get_cookie(password_service, user, jira_base, overwrite=False):
                     wrong_password = True
                     logging.warning('Wrong password')
                     continue
-    if cookies is None:
+    if cookies is None or cookies.strip() == '':
         raise Exception('Unable to get session from jira')
     return cookies
 
