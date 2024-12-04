@@ -8,6 +8,7 @@ import sys
 from functools import partial
 from itertools import chain
 from shlex import quote
+from typing import Any, Optional, Sequence, cast
 
 import ruamel.yaml
 
@@ -692,30 +693,32 @@ def main():
                     no_update = data.pop('no_update', False)
                     force_no_update = data.pop('force_no_update', False)
 
-                    foreach = jinja_render_recursive(
-                        jinja_env_strict,
-                        data.pop('foreach', (None,)),
-                        common_vars,
-                        [filename, 'foreach'],
+                    foreach = cast(
+                        Sequence[Optional[Any]],
+                        jinja_render_recursive(
+                            jinja_env_strict,
+                            data.pop('foreach', (None,)),
+                            common_vars,
+                            [filename, 'foreach'],
+                        ),
                     )
                     foreach_fromvar = data.pop('foreach_fromvar', None)
                     if foreach_fromvar is not None:
-                        foreach = common_vars[
-                            foreach_fromvar
-                        ]  # should crash if not exists
+                        foreach = cast(
+                            Sequence[Optional[Any]], common_vars[foreach_fromvar]
+                        )  # should crash if not exists
                     foreach_key = data.pop('foreach_key', 'item')
                     foreach_namevar = data.pop('foreach_namevar', None)
                     for i, item in enumerate(foreach):
                         basename = filename.replace(issue_type_ext, '')
 
                         if foreach_namevar is not None:
+                            assert (
+                                item is not None
+                            ), 'Using foreach_namevar but no foreach/foreach_fromvar?'
                             basename_key = item[foreach_namevar]
-                        elif isinstance(item, str):
-                            basename_key = item
-                        elif item is None:
-                            basename_key = None
                         else:
-                            basename_key = str(i)
+                            basename_key = item
 
                         name = basename
                         if basename_key is not None:
