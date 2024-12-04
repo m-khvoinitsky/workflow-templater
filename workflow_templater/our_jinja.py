@@ -11,7 +11,8 @@ Changes over regular jinja2:
 
 import os
 from shlex import quote
-from jinja2 import FileSystemLoader, Environment, TemplateNotFound
+
+from jinja2 import Environment, FileSystemLoader, TemplateNotFound
 
 
 class OurJinjaLoader(FileSystemLoader):

@@ -1,5 +1,6 @@
-import ruamel.yaml
 from io import StringIO
+
+import ruamel.yaml
 
 
 def pretty_dump(obj):

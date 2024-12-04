@@ -1,34 +1,36 @@
 #!/usr/bin/env python3
 
-import sys
-import ruamel.yaml
-import os
 import argparse
-import logging
 import json
-from shlex import quote
+import logging
+import os
+import sys
 from functools import partial
 from itertools import chain
+from shlex import quote
+
+import ruamel.yaml
 
 if __name__ == '__main__':
     # preserve ability to launch this script (__main__.py) directly
-    from urlopen_jira import urlopen_jira, get_password
+    from common import pretty_dump
     from our_jinja import OurJinjaEnvironment, OurJinjaLoader
     from quote_windows import escape_cmd, escape_ps
-    from common import pretty_dump
+    from urlopen_jira import get_password, urlopen_jira
 else:
     from .urlopen_jira import urlopen_jira, get_password
     from .our_jinja import OurJinjaEnvironment, OurJinjaLoader
     from .quote_windows import escape_cmd, escape_ps
     from .common import pretty_dump
-from jinja2 import StrictUndefined, DebugUndefined
-import datetime
-import smtplib
-import importlib.util
-from email.mime.text import MIMEText
-from appdirs import user_config_dir
-from natsort import natsorted
 
+import datetime
+import importlib.util
+import smtplib
+from email.mime.text import MIMEText
+
+from appdirs import user_config_dir
+from jinja2 import DebugUndefined, StrictUndefined
+from natsort import natsorted
 
 yaml = ruamel.yaml.YAML(typ='safe')
 

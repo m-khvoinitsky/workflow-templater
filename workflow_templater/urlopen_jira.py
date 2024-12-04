@@ -16,14 +16,15 @@ Recommended usage pattern:
 
 '''
 
-import re
-import keyring
-import logging
 import json
+import logging
+import re
 from getpass import getpass
-from urllib.request import urlopen, Request
-from urllib.parse import urljoin
 from urllib.error import HTTPError
+from urllib.parse import urljoin
+from urllib.request import Request, urlopen
+
+import keyring
 
 try:
     from .common import pretty_dump
