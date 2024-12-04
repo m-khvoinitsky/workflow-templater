@@ -29,7 +29,8 @@ import smtplib
 from email.mime.text import MIMEText
 
 from appdirs import user_config_dir
-from jinja2 import DebugUndefined, StrictUndefined
+from jinja2 import StrictUndefined, Undefined
+from jinja2.utils import missing, object_type_repr
 from natsort import natsorted
 
 yaml = ruamel.yaml.YAML(typ='safe')
@@ -54,10 +55,39 @@ NO_UPDATE_MARKER = '_workflow_templater_no_update'
 FORCE_NO_UPDATE_MARKER = '_workflow_templater_force_no_update'
 
 
+class ChainableDebugUndefined(Undefined):
+    '''Not fully tested and well thought but should work for basic cases'''
+
+    def __getattr__(self, attr: str) -> 'ChainableDebugUndefined':
+        return ChainableDebugUndefined(
+            hint=self._undefined_hint,
+            obj=self._undefined_obj,
+            name=f'{self._undefined_name}[{repr(attr)}]',
+            exc=self._undefined_exception,
+        )
+
+    __getitem__ = __getattr__  # type: ignore
+
+    def __str__(self) -> str:
+        if self._undefined_hint:
+            message = f"undefined value printed: {self._undefined_hint}"
+
+        elif self._undefined_obj is missing:
+            message = self._undefined_name  # type: ignore
+
+        else:
+            message = (
+                f"no such element: {object_type_repr(self._undefined_obj)}"
+                f"[{self._undefined_name!r}]"
+            )
+
+        return f"{{{{ {message} }}}}"
+
+
 def jinja_render_recursive(
     env, what, vars, path, updating_while_creating=False, updating=False
 ):
-    if type(what) == list:
+    if isinstance(what, list):
         newlist = []  # not using map here because we need index for error message
         for i, item in enumerate(what):
             try:
@@ -79,7 +109,7 @@ def jinja_render_recursive(
             except Continue:
                 pass
         return newlist
-    elif type(what) == dict:
+    elif isinstance(what, dict):
         newdict = {}
         for k, v in what.items():
             try:
@@ -101,7 +131,7 @@ def jinja_render_recursive(
             except Continue:
                 pass
         return newdict
-    elif type(what) == str:
+    elif isinstance(what, str):
         try:
             result = env.from_string(what).render(vars)
             JSONMARKER = '_workflow_templater_parsejson:'
@@ -165,6 +195,8 @@ class Issue:
         is_dryrun=False,
         no_update=False,
         updating=False,
+        basename=None,
+        basename_key=None,
     ):
         self.name = name
         self.fromfile = fromfile
@@ -175,6 +207,8 @@ class Issue:
         self.no_update = no_update
         self.updating = updating
         self.self_key_dict = {}
+        self.basename = basename
+        self.basename_key = basename_key
 
     @property
     def final_vars(self):
@@ -188,6 +222,11 @@ class Issue:
     def id(self, id):
         self._id = id
         self.common_vars[f'issuekey_{ self.name }'] = id
+        if self.basename and self.basename != self.name:
+            assert self.basename_key
+            if f'issuekey_{ self.basename }' not in self.common_vars:
+                self.common_vars[f'issuekey_{ self.basename }'] = {}
+            self.common_vars[f'issuekey_{ self.basename }'][self.basename_key] = id
         self.self_key_dict['issuekey_self'] = id
 
     def update(self):
@@ -206,6 +245,8 @@ class JiraIssue(Issue):
         is_dryrun=False,
         no_update=False,
         updating=False,
+        basename=None,
+        basename_key=None,
         jira=None,
     ):
         super().__init__(
@@ -218,6 +259,8 @@ class JiraIssue(Issue):
             is_dryrun,
             no_update,
             updating,
+            basename,
+            basename_key,
         )
         self.jira = jira
         self.update_fields = self.data.pop('update', None)
@@ -280,7 +323,7 @@ class JiraIssue(Issue):
                 logging.info(pretty_dump(update))
             logging.info(pretty_dump({'watchers': watchers}))
         else:
-            if type(update) != list:
+            if isinstance(update, list):
                 # some actions in jira, despite being a list, may contain only one item, for example "issuelinks"
                 # that's why we need to be able to perform several update actions with different data
                 update = [update]
@@ -313,6 +356,8 @@ class EmailIssue(Issue):
         is_dryrun=False,
         no_update=False,
         updating=False,
+        basename=None,
+        basename_key=None,
         smtp=None,
         user=None,
         keyring_service=None,
@@ -328,6 +373,8 @@ class EmailIssue(Issue):
             is_dryrun,
             no_update,
             updating,
+            basename,
+            basename_key,
         )
         self.smtp = smtp
         self.user = user
@@ -518,7 +565,7 @@ def main():
     while True:
         # render jinja until nothing changes
         args_result = jinja_render_recursive(
-            OurJinjaEnvironment(undefined=DebugUndefined),
+            OurJinjaEnvironment(undefined=ChainableDebugUndefined),
             prev_iteration if prev_iteration else vars(args),
             prev_iteration if prev_iteration else vars(args),
             ['config&args:'],
@@ -617,7 +664,7 @@ def main():
     global jinja_env_strict
     jinja_env_permissive = OurJinjaEnvironment(
         loader=OurJinjaLoader(args.template_dir),
-        undefined=DebugUndefined,
+        undefined=ChainableDebugUndefined,
     )
     jinja_env_strict = OurJinjaEnvironment(
         loader=OurJinjaLoader(args.template_dir),
@@ -659,24 +706,25 @@ def main():
                     foreach_key = data.pop('foreach_key', 'item')
                     foreach_namevar = data.pop('foreach_namevar', None)
                     for i, item in enumerate(foreach):
-                        name = '_'.join(
-                            filter(
-                                None,
-                                (
-                                    filename.replace(issue_type_ext, ''),
-                                    (
-                                        (
-                                            item
-                                            if (type(item) == str or item is None)
-                                            else str(i)
-                                        )
-                                        if foreach_namevar is None
-                                        else item[foreach_namevar]
-                                    ),
-                                ),
-                            )
-                        )  # hard to read?
-                        additional_vars = {} if item is None else {foreach_key: item}
+                        basename = filename.replace(issue_type_ext, '')
+
+                        if foreach_namevar is not None:
+                            basename_key = item[foreach_namevar]
+                        elif isinstance(item, str):
+                            basename_key = item
+                        elif item is None:
+                            basename_key = None
+                        else:
+                            basename_key = str(i)
+
+                        name = basename
+                        if basename_key is not None:
+                            name += f'_{basename_key}'
+
+                        additional_vars = {}
+                        if item is not None:
+                            additional_vars[foreach_key] = item
+
                         if if_jinja is not None:
                             computed = jinja_render_recursive(
                                 jinja_env_strict,
@@ -702,6 +750,8 @@ def main():
                                 ),
                                 updating=name in update,
                                 fromfile=filename,
+                                basename=basename,
+                                basename_key=basename_key,
                                 **type_specific_params,
                             )
                         )
