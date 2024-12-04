@@ -8,6 +8,7 @@ Changes over regular jinja2:
   * contains: checks if iterable contains an element;
     similar to built-in "in" but works vice-versa
 '''
+
 import os
 from shlex import quote
 from jinja2 import FileSystemLoader, Environment, TemplateNotFound
@@ -30,6 +31,7 @@ class OurJinjaLoader(FileSystemLoader):
                     return os.path.getmtime(filename) == mtime
                 except OSError:
                     return False
+
             return contents, filename, uptodate
         raise TemplateNotFound(template)
 

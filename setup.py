@@ -20,7 +20,7 @@ setup(
         ],
         'setuptools.installation': [
             'eggsecutable = workflow_templater:main',
-        ]
+        ],
     },
     author="Mikhail Khvoinitsky",
     author_email="me@khvoinitsky.org",

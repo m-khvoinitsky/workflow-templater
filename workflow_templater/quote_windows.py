@@ -1,6 +1,8 @@
 import re
+
 # https://blogs.msdn.microsoft.com/twistylittlepassagesallalike/2011/04/23/everyone-quotes-command-line-arguments-the-wrong-way/
 # Warning: this is not a complete solution! Do not use it for arbitrary uncontrolled data
+
 
 def argv_quote(s):
     # https://docs.microsoft.com/en-us/previous-versions//17w5ykft(v=vs.85)
@@ -15,5 +17,8 @@ def argv_quote(s):
 def escape_ps(args):
     return '--% {}'.format(' '.join(map(argv_quote, args)))
 
+
 def escape_cmd(s):
-    return re.sub(r'\(|\)|\%|\!|\^|\"|\<|\>|\&|\|', lambda mo: f'^{mo.group()}', argv_quote(s))
+    return re.sub(
+        r'\(|\)|\%|\!|\^|\"|\<|\>|\&|\|', lambda mo: f'^{mo.group()}', argv_quote(s)
+    )
