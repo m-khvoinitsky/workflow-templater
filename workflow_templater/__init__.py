@@ -324,7 +324,7 @@ class JiraIssue(Issue):
                 logging.info(pretty_dump(update))
             logging.info(pretty_dump({'watchers': watchers}))
         else:
-            if isinstance(update, list):
+            if not isinstance(update, list):
                 # some actions in jira, despite being a list, may contain only one item, for example "issuelinks"
                 # that's why we need to be able to perform several update actions with different data
                 update = [update]
